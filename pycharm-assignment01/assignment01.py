@@ -42,7 +42,7 @@ input_plot(train_data[:2, :], test_data[:2, :], title="all dataset (overlapped)"
 def binary_classify(data):
     learning_rate = 0.015
     w = np.array([0, 0])  # u, v
-    b = 0
+    b = 0  # bias
 
     losses = []
     accuracies = []
