@@ -25,11 +25,11 @@ def input_plot(g1, g2, title, color, label, **kwargs):
     plt.show()
 
 
-def output_plot(g1, g2, title, color, label):
+def output_plot(g1, g2, title, color, label, legend):
     plt.title(title)
     plt.plot(np.arange(1, len(g1)+1), g1, color=color[0], alpha=0.5, label=label[0])
     plt.plot(np.arange(1, len(g2)+1), g2, color=color[1], alpha=0.5, label=label[1])
-    plt.legend(loc='upper right')
+    plt.legend(loc=legend)
     plt.show()
 
 
@@ -47,9 +47,6 @@ def binary_classify(data):
     losses = []
     accuracies = []
 
-    def init():
-        return
-
     def sigmoid(z):
         return 1 / (1 + np.exp(-z))
 
@@ -59,8 +56,10 @@ def binary_classify(data):
     def loss(prob, ans):
         return (1 / TOTAL) * np.nan_to_num(np.sum(distance(prob, ans)))
 
-    def accuracy():
-        return 0
+    def accuracy(prob, ans):
+        arr = list(map(lambda x: 1 if x >= 0.5 else 0, prob - ans))
+        arr = list(filter(lambda x: x == 0, arr))
+        return len(arr) / TOTAL
 
     def dw(z):
         return (1 / TOTAL) * np.sum(data[:2, :] * (sigmoid(z) - data[2, :]), axis=1)
@@ -78,7 +77,10 @@ def binary_classify(data):
             b = b - (learning_rate * db(z))
 
             n_loss = loss(sigmoid(z), data[2, :])
+            n_acc = accuracy(sigmoid(z), data[2, :])
+
             losses.append(n_loss)
+            accuracies.append(n_acc)
 
             if abs(p_loss - n_loss) < 0.00001:
                 break
@@ -87,7 +89,6 @@ def binary_classify(data):
                 p_loss = n_loss
                 continue
 
-    init()
     iterate()
 
     return losses, accuracies
@@ -96,5 +97,9 @@ def binary_classify(data):
 train_loss, train_acc = binary_classify(train_data)
 test_loss, test_acc = binary_classify(test_data)
 
-output_plot(train_loss, test_loss, "Loss (ENERGY)", ('blue', 'red'), ('training loss', 'testing loss'))
-output_plot(train_acc, test_acc, "Accuracy", ('blue', 'red'), ('training accuracy', 'testing accuracy'))
+output_plot(train_loss, test_loss,
+            title="Loss (ENERGY)", color=('blue', 'red'),
+            label=('training loss', 'testing loss'), legend='upper right')
+output_plot(train_acc, test_acc,
+            title="Accuracy", color=('blue', 'red'),
+            label=('training accuracy', 'testing accuracy'), legend='lower right')
