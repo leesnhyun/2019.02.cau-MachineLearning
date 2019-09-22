@@ -14,23 +14,29 @@ train_data = np.concatenate((c1 + u1, c2 + u1), axis=0).T
 test_data = np.concatenate((c1 + u2, c2 + u2), axis=0).T
 
 
-def input_plot(g1, g2, title, color):
+def input_plot(g1, g2, title, color, label, **kwargs):
     plt.title(title)
-    plt.scatter(g1[0, :], g1[1, :], s=10, color=color[0], alpha=0.5)
-    plt.scatter(g2[0, :], g2[1, :], s=10, color=color[1], alpha=0.5)
+    plt.scatter(g1[0, :], g1[1, :], s=10, color=color[0], alpha=0.5, label=label[0])
+    plt.scatter(g2[0, :], g2[1, :], s=10, color=color[1], alpha=0.5, label=label[1])
+
+    if kwargs.get("legend"):
+        plt.legend(loc='upper left')
+
     plt.show()
 
 
-def output_plot(g1, g2, title, color):
+def output_plot(g1, g2, title, color, label):
     plt.title(title)
-    plt.plot(np.arange(1, len(g1)), g1, color=color[0])
-    plt.plot(np.arange(1, len(g2)), g2, color=color[1])
+    plt.plot(np.arange(1, len(g1)+1), g1, color=color[0], alpha=0.5, label=label[0])
+    plt.plot(np.arange(1, len(g2)+1), g2, color=color[1], alpha=0.5, label=label[1])
+    plt.legend(loc='upper right')
     plt.show()
 
 
-input_plot(train_data[:2, :N], train_data[:2, N:], title='training dataset', color=('blue', 'blue'))
-input_plot(test_data[:2, :N], test_data[:2, N:], title='testing dataset', color=('red', 'red'))
-input_plot(train_data[:2, :], test_data[:2, :], title="all dataset (overlapped)", color=('blue', 'red'))
+input_plot(train_data[:2, :N], train_data[:2, N:], title='training dataset', color=('blue', 'blue'), label=('c1', 'c2'))
+input_plot(test_data[:2, :N], test_data[:2, N:], title='testing dataset', color=('red', 'red'), label=('c1', 'c2'))
+input_plot(train_data[:2, :], test_data[:2, :], title="all dataset (overlapped)",
+           color=('blue', 'red'), label=('training data', 'testing data'), legend=True)
 
 
 def binary_classify(data):
@@ -74,7 +80,7 @@ def binary_classify(data):
             n_loss = loss(sigmoid(z), data[2, :])
             losses.append(n_loss)
 
-            if n_loss == p_loss:
+            if abs(p_loss - n_loss) < 0.00001:
                 break
             else:
                 print(n_loss)
@@ -84,10 +90,11 @@ def binary_classify(data):
     init()
     iterate()
 
-    return losses
+    return losses, accuracies
 
 
-train_loss = binary_classify(train_data)
-test_loss = binary_classify(test_data)
+train_loss, train_acc = binary_classify(train_data)
+test_loss, test_acc = binary_classify(test_data)
 
-output_plot(train_loss, test_loss, "loss", ('blue', 'red'))
+output_plot(train_loss, test_loss, "Loss (ENERGY)", ('blue', 'red'), ('training loss', 'testing loss'))
+output_plot(train_acc, test_acc, "Accuracy", ('blue', 'red'), ('training accuracy', 'testing accuracy'))
