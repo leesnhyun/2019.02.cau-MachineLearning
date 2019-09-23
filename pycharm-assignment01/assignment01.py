@@ -33,8 +33,9 @@ def output_plot(g1, g2, title, color, label, legend):
     plt.show()
 
 
-input_plot(train_data[:2, :N], train_data[:2, N:], title='training dataset', color=('blue', 'blue'), label=('c1', 'c2'))
-input_plot(test_data[:2, :N], test_data[:2, N:], title='testing dataset', color=('red', 'red'), label=('c1', 'c2'))
+input_plot(train_data[:2, :N], train_data[:2, N:], title='training dataset', color=('green', 'orange'),
+           label=('c1', 'c2'))
+input_plot(test_data[:2, :N], test_data[:2, N:], title='testing dataset', color=('green', 'orange'), label=('c1', 'c2'))
 input_plot(train_data[:2, :], test_data[:2, :], title="all dataset (overlapped)",
            color=('blue', 'red'), label=('training data', 'testing data'), legend=True)
 
