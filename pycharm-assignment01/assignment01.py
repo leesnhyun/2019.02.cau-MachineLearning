@@ -27,26 +27,28 @@ def input_plot(g1, g2, title, color, label, **kwargs):
 
 def output_plot(g1, g2, title, color, label, legend):
     plt.title(title)
-    plt.plot(np.arange(1, len(g1)+1), g1, color=color[0], alpha=0.5, label=label[0])
-    plt.plot(np.arange(1, len(g2)+1), g2, color=color[1], alpha=0.5, label=label[1])
+    plt.plot(np.arange(1, len(g1) + 1), g1, color=color[0], alpha=0.5, label=label[0])
+    plt.plot(np.arange(1, len(g2) + 1), g2, color=color[1], alpha=0.5, label=label[1])
     plt.legend(loc=legend)
     plt.show()
 
 
 input_plot(train_data[:2, :N], train_data[:2, N:], title='training dataset', color=('green', 'orange'),
            label=('c1', 'c2'))
-input_plot(test_data[:2, :N], test_data[:2, N:], title='testing dataset', color=('green', 'orange'), label=('c1', 'c2'))
+input_plot(test_data[:2, :N], test_data[:2, N:], title='testing dataset', color=('blue', 'yellow'), label=('c1', 'c2'))
 input_plot(train_data[:2, :], test_data[:2, :], title="all dataset (overlapped)",
            color=('blue', 'red'), label=('training data', 'testing data'), legend=True)
 
 
-def binary_classify(data):
+def binary_classify():
     learning_rate = 0.015
     w = np.array([0, 0])  # u, v
     b = 0  # bias
 
-    losses = []
-    accuracies = []
+    train_losses = []
+    test_losses = []
+    train_accuracies = []
+    test_accuracies = []
 
     def sigmoid(z):
         return 1 / (1 + np.exp(-z))
@@ -63,40 +65,46 @@ def binary_classify(data):
         return len(arr) / TOTAL
 
     def dw(z):
-        return (1 / TOTAL) * np.sum(data[:2, :] * (sigmoid(z) - data[2, :]), axis=1)
+        return (1 / TOTAL) * np.sum(train_data[:2, :] * (sigmoid(z) - train_data[2, :]), axis=1)
 
     def db(z):
-        return (1 / TOTAL) * np.sum(sigmoid(z) - data[2, :])
+        return (1 / TOTAL) * np.sum(sigmoid(z) - train_data[2, :])
 
     def iterate():
-        p_loss = 0
-        nonlocal w, b, losses, accuracies
+        p_train_loss = 0
+        nonlocal w, b, train_losses, test_losses, train_accuracies, test_accuracies
 
         while True:
-            z = np.dot(w.T, data[:2, :]) + b
-            w = w - (learning_rate * dw(z))
-            b = b - (learning_rate * db(z))
+            train_z = np.dot(w.T, train_data[:2, :]) + b
+            test_z = np.dot(w.T, test_data[:2, :]) + b
 
-            n_loss = loss(sigmoid(z), data[2, :])
-            n_acc = accuracy(sigmoid(z), data[2, :])
+            w = w - (learning_rate * dw(train_z))
+            b = b - (learning_rate * db(train_z))
 
-            losses.append(n_loss)
-            accuracies.append(n_acc)
+            n_train_loss = loss(sigmoid(train_z), train_data[2, :])
+            n_test_loss = loss(sigmoid(test_z), test_data[2, :])
 
-            if abs(p_loss - n_loss) < 0.00001:
+            n_train_acc = accuracy(sigmoid(train_z), train_data[2, :])
+            n_test_acc = accuracy(sigmoid(test_z), test_data[2, :])
+
+            train_losses.append(n_train_loss)
+            test_losses.append(n_test_loss)
+            train_accuracies.append(n_train_acc)
+            test_accuracies.append(n_test_acc)
+
+            if abs(p_train_loss - n_train_loss) < 10e-6:
                 break
             else:
-                print(n_loss)
-                p_loss = n_loss
+                print(n_train_loss)
+                p_train_loss = n_train_loss
                 continue
 
     iterate()
 
-    return losses, accuracies
+    return train_losses, test_losses, train_accuracies, test_accuracies
 
 
-train_loss, train_acc = binary_classify(train_data)
-test_loss, test_acc = binary_classify(test_data)
+train_loss, test_loss, train_acc, test_acc = binary_classify()
 
 output_plot(train_loss, test_loss,
             title="Loss (ENERGY)", color=('blue', 'red'),
