@@ -57,8 +57,8 @@ def binary_classify(data):
         return (1 / TOTAL) * np.nan_to_num(np.sum(distance(prob, ans)))
 
     def accuracy(prob, ans):
-        arr = list(map(lambda x: 1 if x >= 0.5 else 0, prob - ans))
-        arr = list(filter(lambda x: x == 0, arr))
+        arr = np.array(list(map(lambda x: 1 if x > 0.5 else 0, prob)))
+        arr = list(filter(lambda x: x == 0, arr - ans))
         return len(arr) / TOTAL
 
     def dw(z):
