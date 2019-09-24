@@ -19,6 +19,10 @@ def input_plot(g1, g2, title, color, label, **kwargs):
     plt.scatter(g1[0, :], g1[1, :], s=10, color=color[0], alpha=0.5, label=label[0])
     plt.scatter(g2[0, :], g2[1, :], s=10, color=color[1], alpha=0.5, label=label[1])
 
+    if kwargs.get("divide"):
+        plt.scatter(kwargs.get("g3")[0, :], kwargs.get("g3")[1, :], s=10, color=color[2], alpha=0.5, label=label[2])
+        plt.scatter(kwargs.get("g4")[0, :], kwargs.get("g4")[1, :], s=10, color=color[3], alpha=0.5, label=label[3])
+
     if kwargs.get("legend"):
         plt.legend(loc='upper left')
 
@@ -33,11 +37,17 @@ def output_plot(g1, g2, title, color, label, legend):
     plt.show()
 
 
-input_plot(train_data[:2, :N], train_data[:2, N:], title='training dataset', color=('green', 'orange'),
-           label=('c1', 'c2'))
-input_plot(test_data[:2, :N], test_data[:2, N:], title='testing dataset', color=('blue', 'yellow'), label=('c1', 'c2'))
-input_plot(train_data[:2, :], test_data[:2, :], title="all dataset (overlapped)",
-           color=('blue', 'red'), label=('training data', 'testing data'), legend=True)
+input_plot(g1=train_data[:2, :N], g2=train_data[:2, N:],
+           title='training dataset', color=('green', 'orange'), legend=True,
+           label=('training data (0)', 'training data (1)'))
+input_plot(g1=test_data[:2, :N], g2=test_data[:2, N:],
+           title='testing dataset', color=('blue', 'red'), legend=True,
+           label=('testing data (0)', 'testing data (1)'))
+input_plot(g1=train_data[:2, :N], g3=test_data[:2, :N],
+           g2=train_data[:2, N:], g4=test_data[:2, N:],
+           title="all dataset (overlapped)", color=('green', 'orange', 'blue', 'red'),
+           label=('training data (0)', 'training data (1)', 'testing data (0)', 'testing data (1)'),
+           legend=True, divide=True)
 
 
 def binary_classify():
