@@ -78,15 +78,15 @@ input_plot(g1=train_data[:2, :N], g3=test_data[:2, :N],
 ```
 
 
-![png](output_8_0.png)
+![png](images/output_8_0.png)
 
 
 
-![png](output_8_1.png)
+![png](images/output_8_1.png)
 
 
 
-![png](output_8_2.png)
+![png](images/output_8_2.png)
 
 
 ## Implements of binary classificiaton
@@ -181,9 +181,9 @@ output_plot(train_acc, test_acc,
 ```
 
 
-![png](output_15_0.png)
+![png](images/output_15_0.png)
 
 
 
-![png](output_15_1.png)
+![png](images/output_15_1.png)
 
