@@ -72,6 +72,15 @@ def output_plot(g1, g2, title, color, label, legend):
     plt.show()
 
 
+def output_frame_plot(tloss, vloss, tacc, vacc):
+    print("           |  loss  |  accuracy |")
+    print("----------------------------------------------------")
+    print("training   |   %.2f   |    %.2f    |" % (tloss, tacc))
+    print("----------------------------------------------------")
+    print("validation |   %.2f   |    %.2f    |" % (vloss, vacc))
+    print("---------------------------------------------------")
+
+
 def binary_classify(train_data, validation_data, train_label, validation_label):
 
     num_of_train = train_data.shape[1]
@@ -148,3 +157,5 @@ output_plot(train_loss, test_loss,
 output_plot(train_acc, test_acc,
             title="Accuracy", color=('blue', 'red'),
             label=('training accuracy', 'testing accuracy'), legend='lower right')
+
+output_frame_plot(train_loss[-1], test_loss[-1], train_acc[-1], test_acc[-1])
