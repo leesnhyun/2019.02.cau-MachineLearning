@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -34,8 +35,8 @@ def pre_process(batch_size=3, num_workers=1):
     train_data = np.empty((DIMENSION, 0))
     validation_data = np.empty((DIMENSION, 0))
 
-    train_label = np.empty((1, 0))
-    validation_label = np.empty((1, 0))
+    train_label = np.array([])
+    validation_label = np.array([])
 
     for i, data in enumerate(trainloader):
         # inputs is the image
@@ -46,9 +47,8 @@ def pre_process(batch_size=3, num_workers=1):
 
         # [batch_size, 1, height, width] => [ width * height * channel, batch_size ]
         x = np.array(inputs).transpose((2, 3, 0, 1)).reshape((DIMENSION, len(labels)))
-        labels = np.array(labels).reshape((1, len(labels)))
         train_data = np.concatenate((train_data, x), axis=1)
-        train_label = np.concatenate((train_label, labels), axis=1)
+        train_label = np.concatenate((train_label, np.array(labels)))
 
     # load validation images of the batch size for every iteration
     for i, data in enumerate(valloader):
@@ -58,9 +58,8 @@ def pre_process(batch_size=3, num_workers=1):
 
         # [batch_size, 1, height, width] => [ width * height * channel, batch_size ]
         x = np.array(inputs).transpose((2, 3, 0, 1)).reshape((DIMENSION, len(labels)))
-        labels = np.array(labels).reshape((1, len(labels)))
         validation_data = np.concatenate((validation_data, x), axis=1)
-        validation_label = np.concatenate((validation_label, labels), axis=1)
+        validation_label = np.concatenate((validation_label, np.array(labels)))
 
     return train_data, validation_data, train_label, validation_label
 
@@ -77,7 +76,7 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
 
     num_of_train = train_data.shape[1]
 
-    learning_rate = 0.015
+    learning_rate = 0.0015
     w = np.zeros(IMAGE_WIDTH * IMAGE_HEIGHT + 1)  # model parameters with bias
 
     train_losses = []
@@ -92,18 +91,15 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
         return -(np.nan_to_num(ans * np.log(prob)) + np.nan_to_num((1 - ans) * np.log(1 - prob)))
 
     def loss(prob, ans):
-        return (1 / num_of_train) * np.nan_to_num(np.sum(distance(prob, ans)))
+        return (1 / len(ans)) * np.nan_to_num(np.sum(distance(prob, ans)))
 
     def accuracy(prob, ans):
         arr = np.array(list(map(lambda x: 1 if x > 0.5 else 0, prob)))
         arr = list(filter(lambda x: x == 0, arr - ans))
-        return len(arr) / num_of_train
+        return len(arr) / len(ans)
 
     def dw(x, z):
-        return (1 / num_of_train) * np.sum(x * (sigmoid(z) - train_data), axis=1)
-
-    def db(z):
-        return (1 / num_of_train) * np.sum(sigmoid(z) - train_data[2, :])
+        return (1 / x.shape[1]) * np.sum(x * (sigmoid(z) - train_label), axis=1)
 
     def iterate():
         p_train_loss = 0
@@ -119,18 +115,18 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
 
             w = w - (learning_rate * dw(train_data_with_bias, train_z))
 
-            n_train_loss = loss(sigmoid(train_z), train_data[2, :])
-            n_test_loss = loss(sigmoid(test_z), validation_data[2, :])
+            n_train_loss = loss(sigmoid(train_z), train_label)
+            n_test_loss = loss(sigmoid(test_z), validation_label)
 
-            n_train_acc = accuracy(sigmoid(train_z), train_data[2, :])
-            n_test_acc = accuracy(sigmoid(test_z), validation_data[2, :])
+            n_train_acc = accuracy(sigmoid(train_z), train_label)
+            n_test_acc = accuracy(sigmoid(test_z), validation_label)
 
             train_losses.append(n_train_loss)
             test_losses.append(n_test_loss)
             train_accuracies.append(n_train_acc)
             test_accuracies.append(n_test_acc)
 
-            if abs(p_train_loss - n_train_loss) < 10e-6:
+            if abs(p_train_loss - n_train_loss) < 10e-5:
                 break
             else:
                 print(n_train_loss)
