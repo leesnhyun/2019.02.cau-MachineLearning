@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import time
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -73,25 +73,26 @@ def output_plot(g1, g2, title, color, label, legend):
 
 
 def output_frame_plot(tloss, vloss, tacc, vacc):
-    print("           |  loss  |  accuracy |")
-    print("----------------------------------------------------")
+    print("           |   loss   |  accuracy  |")
+    print("---------------------------------------")
     print("training   |   %.2f   |    %.2f    |" % (tloss, tacc))
     print("----------------------------------------------------")
     print("validation |   %.2f   |    %.2f    |" % (vloss, vacc))
-    print("---------------------------------------------------")
+    print("---------------------------------------")
 
 
 def binary_classify(train_data, validation_data, train_label, validation_label):
 
-    num_of_train = train_data.shape[1]
+    learning_rate = 0.003
+    epsilon = 10e-6
 
-    learning_rate = 0.0015
     w = np.zeros(IMAGE_WIDTH * IMAGE_HEIGHT + 1)  # model parameters with bias
 
     train_losses = []
     test_losses = []
     train_accuracies = []
     test_accuracies = []
+    elapsed_times = []
 
     def sigmoid(z):
         return 1 / (1 + np.exp(-z))
@@ -112,17 +113,20 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
 
     def iterate():
         p_train_loss = 0
-        nonlocal w, train_losses, test_losses, train_accuracies, test_accuracies
+        nonlocal w, train_losses, test_losses, train_accuracies, test_accuracies, elapsed_times
+
+        train_data_with_bias = np.concatenate((train_data, np.ones((1, train_data.shape[1]))))
+        validation_data_with_bias = np.concatenate((validation_data, np.ones((1, validation_data.shape[1]))))
 
         while True:
-
-            train_data_with_bias = np.concatenate((train_data, np.ones((1, train_data.shape[1]))))
-            validation_data_with_bias = np.concatenate((validation_data, np.ones((1, validation_data.shape[1]))))
+            start_time = time.time()
 
             train_z = np.dot(w.T, train_data_with_bias)
             test_z = np.dot(w.T, validation_data_with_bias)
 
             w = w - (learning_rate * dw(train_data_with_bias, train_z))
+
+            end_time = time.time()
 
             n_train_loss = loss(sigmoid(train_z), train_label)
             n_test_loss = loss(sigmoid(test_z), validation_label)
@@ -134,8 +138,9 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
             test_losses.append(n_test_loss)
             train_accuracies.append(n_train_acc)
             test_accuracies.append(n_test_acc)
+            elapsed_times.append(end_time-start_time)
 
-            if abs(p_train_loss - n_train_loss) < 10e-5:
+            if abs(p_train_loss - n_train_loss) < epsilon:
                 break
             else:
                 print(n_train_loss)
@@ -144,12 +149,12 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
 
     iterate()
 
-    return train_losses, test_losses, train_accuracies, test_accuracies
+    return train_losses, test_losses, train_accuracies, test_accuracies, elapsed_times
 
 
 t_data, v_data, t_label, v_label = pre_process(batch_size=3, num_workers=1)
 
-train_loss, test_loss, train_acc, test_acc = binary_classify(t_data, v_data, t_label, v_label)
+train_loss, test_loss, train_acc, test_acc, elapsed_time = binary_classify(t_data, v_data, t_label, v_label)
 
 output_plot(train_loss, test_loss,
             title="Loss (ENERGY)", color=('blue', 'red'),
@@ -157,5 +162,9 @@ output_plot(train_loss, test_loss,
 output_plot(train_acc, test_acc,
             title="Accuracy", color=('blue', 'red'),
             label=('training accuracy', 'testing accuracy'), legend='lower right')
+
+output_plot(elapsed_time, [],
+            title="Elapsed Time", color=('blue', 'blue'),
+            label=('elapsed time', ''), legend='lower right')
 
 output_frame_plot(train_loss[-1], test_loss[-1], train_acc[-1], test_acc[-1])
