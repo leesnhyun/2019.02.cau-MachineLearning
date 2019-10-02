@@ -159,6 +159,7 @@ train_loss, test_loss, train_acc, test_acc, elapsed_time = binary_classify(t_dat
 output_plot(train_loss, test_loss,
             title="Loss (ENERGY)", color=('blue', 'red'),
             label=('training loss', 'testing loss'), legend='upper right')
+
 output_plot(train_acc, test_acc,
             title="Accuracy", color=('blue', 'red'),
             label=('training accuracy', 'testing accuracy'), legend='lower right')
