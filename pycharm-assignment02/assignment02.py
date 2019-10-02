@@ -76,14 +76,14 @@ def output_frame_plot(tloss, vloss, tacc, vacc):
     print("           |   loss   |  accuracy  |")
     print("---------------------------------------")
     print("training   |   %.2f   |    %.2f    |" % (tloss, tacc))
-    print("----------------------------------------------------")
+    print("---------------------------------------")
     print("validation |   %.2f   |    %.2f    |" % (vloss, vacc))
     print("---------------------------------------")
 
 
 def binary_classify(train_data, validation_data, train_label, validation_label):
 
-    learning_rate = 0.003
+    learning_rate = 0.002
     epsilon = 10e-6
 
     w = np.zeros(IMAGE_WIDTH * IMAGE_HEIGHT + 1)  # model parameters with bias
