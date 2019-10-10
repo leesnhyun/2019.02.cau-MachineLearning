@@ -82,16 +82,16 @@ def output_frame_plot(tloss, vloss, tacc, vacc):
 
 def binary_classify(train_data, validation_data, train_label, validation_label):
     num_of_layers = 3
-    num_of_nodes = 100
+    num_of_nodes = 10
     learning_rate = 0.01
-    epsilon = 10e-7
+    epsilon = 10e-8
 
-    u = np.zeros((DIMENSION+1, num_of_nodes))
-    # u = np.random.randn(DIMENSION+1, num_of_nodes)
+    # u = np.zeros((DIMENSION+1, num_of_nodes))
+    u = np.random.randn(DIMENSION+1, num_of_nodes)
     v = np.random.randn(num_of_nodes, num_of_nodes)
     # v = np.zeros((num_of_nodes, num_of_nodes))
-    w = np.zeros((num_of_nodes, 1))
-    # w = np.random.randn(num_of_nodes, 1)
+    # w = np.zeros((num_of_nodes, 1))
+    w = np.random.randn(num_of_nodes, 1)
 
     train_losses = []
     test_losses = []
@@ -124,11 +124,11 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
         arr = list(filter(lambda x: x == 0, arr - ans))
         return len(arr) / len(ans)
 
-    def du(x, a, b, c):
-        return (1/c.shape[1]) * np.dot(((((sigmoid(c) - train_label) * d_sigmoid(c)) * d_sigmoid(b)) * d_sigmoid(a)), x.T)
+    def du(x, a, b, c, v):
+        return (1/c.shape[1]) * np.dot(np.dot(v, np.dot(w, ((sigmoid(c) - train_label) * d_sigmoid(c))) * d_sigmoid(b)) * d_sigmoid(a), x.T)
 
-    def dv(a, b, c):
-        return (1/c.shape[1]) * np.dot((((sigmoid(c) - train_label) * d_sigmoid(c)) * d_sigmoid(b)), sigmoid(a).T)
+    def dv(a, b, c, w):
+        return (1/c.shape[1]) * np.dot(np.dot(w, ((sigmoid(c) - train_label) * d_sigmoid(c))) * d_sigmoid(b), sigmoid(a).T)
 
     def dw(b, c):
         return (1/c.shape[1]) * np.dot(((sigmoid(c) - train_label) * d_sigmoid(c)), sigmoid(b).T)
@@ -145,16 +145,16 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
             # forward propagation
             a = np.dot(u.T, train_data_with_bias)
             b = np.dot(v.T, sigmoid(a))
-            c = np.dot(w.T, sigmoid(b)) # matrix to vector
+            c = np.dot(w.T, sigmoid(b))
 
             vz = np.dot(u.T, validation_data_with_bias)
             vz = np.dot(v.T, sigmoid(vz))
-            vz = np.dot(w.T, sigmoid(vz)) # matrix to vector
+            vz = np.dot(w.T, sigmoid(vz))
 
             # back propagation
-            u = u - (learning_rate * du(train_data_with_bias, a, b, c)).T
-            v = v - (learning_rate * dv(a, b, c)).T
             w = w - (learning_rate * dw(b, c)).T  #(100,1)
+            v = v - (learning_rate * dv(a, b, c, w)).T
+            u = u - (learning_rate * du(train_data_with_bias, a, b, c, v)).T
 
             n_train_loss = loss(sigmoid(c), train_label)
             n_test_loss = loss(sigmoid(vz), validation_label)
