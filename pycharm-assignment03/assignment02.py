@@ -82,13 +82,14 @@ def output_frame_plot(tloss, vloss, tacc, vacc):
 
 def binary_classify(train_data, validation_data, train_label, validation_label):
     num_of_layers = 3
-    num_of_nodes = 10
-    learning_rate = 0.01
-    epsilon = 10e-8
+    num_of_nodes = 50
+    learning_rate = 0.055
+    epsilon = 10e-6
 
+    # INITIALIZE u v z
     # u = np.zeros((DIMENSION+1, num_of_nodes))
-    u = np.random.randn(DIMENSION+1, num_of_nodes)
-    v = np.random.randn(num_of_nodes, num_of_nodes)
+    u = np.random.randn(DIMENSION+1, num_of_nodes*3)
+    v = np.random.randn(num_of_nodes*3, num_of_nodes)
     # v = np.zeros((num_of_nodes, num_of_nodes))
     # w = np.zeros((num_of_nodes, 1))
     w = np.random.randn(num_of_nodes, 1)
@@ -107,15 +108,6 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
     def cross_entropy(prob, ans):
         return -(np.nan_to_num(ans * np.log(prob)) + np.nan_to_num((1 - ans) * np.log(1 - prob)))
 
-    def d_cross_entropy(y_hat):
-        return -(np.divide(train_label, y_hat) - np.divide((1-train_label), 1-y_hat))
-
-    def d_loss(prob):
-        return np.sum(np.nan_to_num(d_cross_entropy(prob)))
-
-    def d_loss2(x, z):
-        return (1 / x.shape[1]) * np.sum(x * (sigmoid(z) - train_label), axis=1, keepdims=True)
-
     def loss(prob, ans):
         return (1 / len(ans)) * np.nan_to_num(np.sum(cross_entropy(prob, ans)))
 
@@ -124,17 +116,18 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
         arr = list(filter(lambda x: x == 0, arr - ans))
         return len(arr) / len(ans)
 
-    def du(x, a, b, c, v):
-        return (1/c.shape[1]) * np.dot(np.dot(v, np.dot(w, ((sigmoid(c) - train_label) * d_sigmoid(c))) * d_sigmoid(b)) * d_sigmoid(a), x.T)
+    def du(x, a, b, c, v, cached):
+        return (1/c.shape[1]) * np.dot(np.dot(v, np.dot(w, cached) * d_sigmoid(b)) * d_sigmoid(a), x.T)
 
-    def dv(a, b, c, w):
-        return (1/c.shape[1]) * np.dot(np.dot(w, ((sigmoid(c) - train_label) * d_sigmoid(c))) * d_sigmoid(b), sigmoid(a).T)
+    def dv(a, b, c, w, cached):
+        return (1/c.shape[1]) * np.dot(np.dot(w, cached) * d_sigmoid(b), sigmoid(a).T)
 
-    def dw(b, c):
-        return (1/c.shape[1]) * np.dot(((sigmoid(c) - train_label) * d_sigmoid(c)), sigmoid(b).T)
+    def dw(b, c, cached):
+        return (1/c.shape[1]) * np.dot(cached, sigmoid(b).T)
 
     def iterate():
         p_train_loss = 0
+        iter = 0
         nonlocal u, v, w
         nonlocal train_losses, test_losses, train_accuracies, test_accuracies
 
@@ -152,9 +145,10 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
             vz = np.dot(w.T, sigmoid(vz))
 
             # back propagation
-            w = w - (learning_rate * dw(b, c)).T  #(100,1)
-            v = v - (learning_rate * dv(a, b, c, w)).T
-            u = u - (learning_rate * du(train_data_with_bias, a, b, c, v)).T
+            cached = (sigmoid(c) - train_label)
+            w = w - (learning_rate * dw(b, c, cached)).T
+            v = v - (learning_rate * dv(a, b, c, w, cached)).T
+            u = u - (learning_rate * du(train_data_with_bias, a, b, c, v, cached)).T
 
             n_train_loss = loss(sigmoid(c), train_label)
             n_test_loss = loss(sigmoid(vz), validation_label)
@@ -170,7 +164,8 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
             if abs(p_train_loss - n_train_loss) < epsilon:
                 break
             else:
-                print(n_train_loss)
+                # iter = iter + 1
+                # print('t loss: %s, v loss: %s' % (n_train_loss, n_test_loss))
                 p_train_loss = n_train_loss
                 continue
 
@@ -185,10 +180,10 @@ train_loss, test_loss, train_acc, test_acc = binary_classify(t_data, v_data, t_l
 
 output_plot(train_loss, test_loss,
             title="Loss (ENERGY)", color=('blue', 'red'),
-            label=('training loss', 'testing loss'), legend='upper right')
+            label=('train loss', 'validation loss'), legend='upper right')
 
 output_plot(train_acc, test_acc,
             title="Accuracy", color=('blue', 'red'),
-            label=('training accuracy', 'testing accuracy'), legend='lower right')
+            label=('train accuracy', 'validation accuracy'), legend='lower right')
 
 output_frame_plot(train_loss[-1], test_loss[-1], train_acc[-1], test_acc[-1])
