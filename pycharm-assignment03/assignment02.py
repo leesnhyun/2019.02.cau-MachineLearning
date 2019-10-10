@@ -90,6 +90,7 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
     # u = np.zeros((DIMENSION+1, num_of_nodes))
     u = np.random.randn(DIMENSION+1, num_of_nodes*3)
     v = np.random.randn(num_of_nodes*3, num_of_nodes)
+    
     # v = np.zeros((num_of_nodes, num_of_nodes))
     # w = np.zeros((num_of_nodes, 1))
     w = np.random.randn(num_of_nodes, 1)
