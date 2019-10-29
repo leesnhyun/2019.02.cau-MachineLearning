@@ -106,6 +106,26 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
     def d_sigmoid(z):
         return sigmoid(z) * (1 - sigmoid(z))
 
+    def tanh(z):
+        return (np.exp(z) - np.exp(-z)) / (np.exp(z) + np.exp(-z))
+
+    def relu(z):
+        return np.maximum(0, z)
+
+    def activate(z, case):
+        if case == 'sss':
+            yield sigmoid(z)
+            yield sigmoid(z)
+            yield sigmoid(z)
+        elif case == 'tts':
+            yield tanh(z)
+            yield tanh(z)
+            yield sigmoid(z)
+        elif case == 'rrs':
+            yield relu(z)
+            yield relu(z)
+            yield sigmoid(z)
+
     def cross_entropy(prob, ans):
         return -(np.nan_to_num(ans * np.log(prob)) + np.nan_to_num((1 - ans) * np.log(1 - prob)))
 
@@ -131,13 +151,17 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
         nonlocal u, v, w, b1, b2, b3
         nonlocal train_losses, test_losses, train_accuracies, test_accuracies
 
-
         while True:
 
             # forward propagation #
-            a = np.dot(u.T, train_data) + b1
-            b = np.dot(v.T, sigmoid(a)) + b2
-            c = np.dot(w.T, sigmoid(b)) + b3
+            z1 = np.dot(u.T, train_data) + b1
+            a1 = sigmoid(z1)
+
+            z2 = np.dot(v.T, a1) + b2
+            a2 = sigmoid(z2)
+
+            z3 = np.dot(w.T, a2) + b3
+            a3 = sigmoid(z3)
 
             vz = np.dot(u.T, validation_data) + b1
             vz = np.dot(v.T, sigmoid(vz)) + b2
@@ -145,22 +169,22 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
             ####
 
             # back propagation
-            cached = (sigmoid(c) - train_label)
-            w = w - (learning_rate * dw(b, c, cached)).T
-            v = v - (learning_rate * dv(a, b, c, w, cached)).T
-            u = u - (learning_rate * du(train_data, a, b, c, v, cached)).T
+            cached = (a3 - train_label)
+            w = w - (learning_rate * dw(z2, z3, cached)).T
+            v = v - (learning_rate * dv(z1, z2, z3, w, cached)).T
+            u = u - (learning_rate * du(train_data, z1, z2, z3, v, cached)).T
 
-            b3 = b3 - (learning_rate * (np.sum(cached, axis=1, keepdims=True) / c.shape[1]))
-            b2 = b2 - (learning_rate * (np.sum(np.dot(w, cached) * d_sigmoid(b), axis=1, keepdims=True) / c.shape[1]))
-            b1 = b1 - (learning_rate * (np.sum(np.dot(v, np.dot(w, cached) * d_sigmoid(b)) * d_sigmoid(a), axis=1, keepdims=True) / c.shape[1]))
+            b3 = b3 - (learning_rate * (np.sum(cached, axis=1, keepdims=True) / z3.shape[1]))
+            b2 = b2 - (learning_rate * (np.sum(np.dot(w, cached) * d_sigmoid(z2), axis=1, keepdims=True) / z3.shape[1]))
+            b1 = b1 - (learning_rate * (np.sum(np.dot(v, np.dot(w, cached) * d_sigmoid(z2)) * d_sigmoid(z1), axis=1, keepdims=True) / z3.shape[1]))
             ####
 
             # get losses
-            n_train_loss = loss(sigmoid(c), train_label)
+            n_train_loss = loss(a3, train_label)
             n_test_loss = loss(sigmoid(vz), validation_label)
 
             # get accuracies
-            n_train_acc = accuracy(sigmoid(c), train_label)
+            n_train_acc = accuracy(a3, train_label)
             n_test_acc = accuracy(sigmoid(vz), validation_label)
 
             train_losses.append(n_train_loss)
