@@ -79,7 +79,9 @@ def output_frame_plot(tloss, vloss, tacc, vacc):
     print("---------------------------------------")
 
 
-def binary_classify(train_data, validation_data, train_label, validation_label):
+# binary classifier
+def binary_classify(train_data, validation_data, train_label, validation_label, gn_act, gn_d_act):
+
     num_of_layers = 3
     n1, n2 = 150, 50
     learning_rate = 0.055
@@ -100,32 +102,6 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
     train_accuracies = []
     test_accuracies = []
 
-    def sigmoid(z):
-        return 1 / (1 + np.exp(-z))
-
-    def d_sigmoid(z):
-        return sigmoid(z) * (1 - sigmoid(z))
-
-    def tanh(z):
-        return (np.exp(z) - np.exp(-z)) / (np.exp(z) + np.exp(-z))
-
-    def relu(z):
-        return np.maximum(0, z)
-
-    def activate(z, case):
-        if case == 'sss':
-            yield sigmoid(z)
-            yield sigmoid(z)
-            yield sigmoid(z)
-        elif case == 'tts':
-            yield tanh(z)
-            yield tanh(z)
-            yield sigmoid(z)
-        elif case == 'rrs':
-            yield relu(z)
-            yield relu(z)
-            yield sigmoid(z)
-
     def cross_entropy(prob, ans):
         return -(np.nan_to_num(ans * np.log(prob)) + np.nan_to_num((1 - ans) * np.log(1 - prob)))
 
@@ -137,15 +113,6 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
         arr = list(filter(lambda x: x == 0, arr - ans))
         return len(arr) / len(ans)
 
-    def du(x, a, b, c, v, cached):
-        return np.dot(np.dot(v, np.dot(w, cached) * d_sigmoid(b)) * d_sigmoid(a), x.T) / c.shape[1]
-
-    def dv(a, b, c, w, cached):
-        return np.dot(np.dot(w, cached) * d_sigmoid(b), sigmoid(a).T) / c.shape[1]
-
-    def dw(b, c, cached):
-        return np.dot(cached, sigmoid(b).T) / c.shape[1]
-
     def iterate():
         p_train_loss = 0
         nonlocal u, v, w, b1, b2, b3
@@ -155,37 +122,51 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
 
             # forward propagation #
             z1 = np.dot(u.T, train_data) + b1
-            a1 = sigmoid(z1)
+            act = gn_act(z1)
+            a1 = next(act)
 
             z2 = np.dot(v.T, a1) + b2
-            a2 = sigmoid(z2)
+            a2 = act.send(z2)
 
             z3 = np.dot(w.T, a2) + b3
-            a3 = sigmoid(z3)
+            a3 = act.send(z3)
 
             vz = np.dot(u.T, validation_data) + b1
-            vz = np.dot(v.T, sigmoid(vz)) + b2
-            vz = np.dot(w.T, sigmoid(vz)) + b3
+            act = gn_act(vz)
+            vz = np.dot(v.T, next(act)) + b2
+            vz = np.dot(w.T, act.send(vz)) + b3
             ####
 
             # back propagation
-            cached = (a3 - train_label)
-            w = w - (learning_rate * dw(z2, z3, cached)).T
-            v = v - (learning_rate * dv(z1, z2, z3, w, cached)).T
-            u = u - (learning_rate * du(train_data, z1, z2, z3, v, cached)).T
+            d_act = gn_d_act(z2)
+            cw = (a3 - train_label)
+            dw = np.dot(cw, a2.T) / z3.shape[1]
 
-            b3 = b3 - (learning_rate * (np.sum(cached, axis=1, keepdims=True) / z3.shape[1]))
-            b2 = b2 - (learning_rate * (np.sum(np.dot(w, cached) * d_sigmoid(z2), axis=1, keepdims=True) / z3.shape[1]))
-            b1 = b1 - (learning_rate * (np.sum(np.dot(v, np.dot(w, cached) * d_sigmoid(z2)) * d_sigmoid(z1), axis=1, keepdims=True) / z3.shape[1]))
+            cv = np.dot(w, cw) * next(d_act)
+            dv = np.dot(cv, a1.T) / z3.shape[1]
+
+            cu = np.dot(v, cv) * d_act.send(z1)
+            du = np.dot(cu, train_data.T) / z3.shape[1]
+
+            # gradient descent
+            w = w - (learning_rate * dw).T
+            v = v - (learning_rate * dv).T
+            u = u - (learning_rate * du).T
+
+            b3 = b3 - (learning_rate * (np.sum(cw, axis=1, keepdims=True) / z3.shape[1]))
+            b2 = b2 - (learning_rate * (np.sum(cv, axis=1, keepdims=True) / z3.shape[1]))
+            b1 = b1 - (learning_rate * (np.sum(cu, axis=1, keepdims=True) / z3.shape[1]))
             ####
 
             # get losses
-            n_train_loss = loss(a3, train_label)
-            n_test_loss = loss(sigmoid(vz), validation_label)
+            t_hat, v_hat = a3, act.send(vz)
+
+            n_train_loss = loss(t_hat, train_label)
+            n_test_loss = loss(v_hat, validation_label)
 
             # get accuracies
-            n_train_acc = accuracy(a3, train_label)
-            n_test_acc = accuracy(sigmoid(vz), validation_label)
+            n_train_acc = accuracy(t_hat, train_label)
+            n_test_acc = accuracy(v_hat, validation_label)
 
             train_losses.append(n_train_loss)
             test_losses.append(n_test_loss)
@@ -204,17 +185,85 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
     return train_losses, test_losses, train_accuracies, test_accuracies
 
 
-# COLLECTING RESULTS #
-t_data, v_data, t_label, v_label = pre_process(batch_size=3, num_workers=1)
+def learn():
 
-train_loss, test_loss, train_acc, test_acc = binary_classify(t_data, v_data, t_label, v_label)
+    leaky_alpha = 0.1
 
-output_plot(train_loss, test_loss,
-            title="Loss (ENERGY)", color=('blue', 'red'),
-            label=('train loss', 'validation loss'), legend='upper right')
+    t_data, v_data, t_label, v_label = pre_process(batch_size=3, num_workers=1)
+    train_loss, test_loss, train_acc, test_acc = [], [], [], []
 
-output_plot(train_acc, test_acc,
-            title="Accuracy", color=('blue', 'red'),
-            label=('train accuracy', 'validation accuracy'), legend='lower right')
+    # functions
+    def sigmoid(z):
+        return 1 / (1 + np.exp(-z))
 
-output_frame_plot(train_loss[-1], test_loss[-1], train_acc[-1], test_acc[-1])
+    def d_sigmoid(z):
+        return sigmoid(z) * (1 - sigmoid(z))
+
+    def tanh(z):
+        return (np.exp(z) - np.exp(-z)) / (np.exp(z) + np.exp(-z))
+
+    def d_tanh(z):
+        return 1 - (tanh(z) ** 2)
+
+    def relu(z):
+        return np.maximum(0, z)
+
+    def d_relu(z):
+        return np.array(list(map(lambda x: 1 if x > 0 else 0, z.flatten())))
+
+    def leaky_relu(z):
+        return np.maximum(leaky_alpha * z, z)
+
+    def d_relu(z):
+        return np.array(list(map(lambda x: 1 if x > 0 else 0, z.flatten())))
+
+    def d_leaky_relu(z):
+        return np.array(list(map(lambda x: 1 if x > 0 else leaky_alpha, z.flatten())))
+
+    def case1():
+        def act(z):
+            z = yield sigmoid(z)
+            z = yield sigmoid(z)
+            z = yield sigmoid(z)
+
+        def d_act(z):
+            z = yield d_sigmoid(z)
+            z = yield d_sigmoid(z)
+
+        classify(gn=act, dgn=d_act)
+        plot()
+
+    def case2():
+        def act(z):
+            z = yield tanh(z)
+            z = yield tanh(z)
+            z = yield sigmoid(z)
+
+        def d_act(z):
+            z = yield d_tanh(z)
+            z = yield d_tanh(z)
+
+        classify(gn=act, dgn=d_act)
+        plot()
+
+    def classify(gn, dgn):
+        nonlocal train_loss, test_loss, train_acc, test_acc
+        train_loss, test_loss, train_acc, test_acc = binary_classify(t_data, v_data, t_label, v_label, gn, dgn)
+
+    def plot():
+        output_plot(train_loss, test_loss,
+                    title="Loss (ENERGY)", color=('blue', 'red'),
+                    label=('train loss', 'validation loss'), legend='upper right')
+
+        output_plot(train_acc, test_acc,
+                    title="Accuracy", color=('blue', 'red'),
+                    label=('train accuracy', 'validation accuracy'), legend='lower right')
+
+        output_frame_plot(train_loss[-1], test_loss[-1], train_acc[-1], test_acc[-1])
+
+    # case1()
+    case2()
+    # case3()
+
+
+learn()
