@@ -84,7 +84,7 @@ def binary_classify(train_data, validation_data, train_label, validation_label, 
 
     num_of_layers = 3
     n1, n2 = 150, 50
-    learning_rate = 0.055
+    learning_rate = 0.001
     epsilon = 10e-6
 
     # INITIALIZE u v z
@@ -209,16 +209,13 @@ def learn():
         return np.maximum(0, z)
 
     def d_relu(z):
-        return np.array(list(map(lambda x: 1 if x > 0 else 0, z.flatten())))
+        return np.where(z <= 0, 0, 1)
 
     def leaky_relu(z):
         return np.maximum(leaky_alpha * z, z)
 
-    def d_relu(z):
-        return np.array(list(map(lambda x: 1 if x > 0 else 0, z.flatten())))
-
     def d_leaky_relu(z):
-        return np.array(list(map(lambda x: 1 if x > 0 else leaky_alpha, z.flatten())))
+        return np.where(z <= 0, leaky_alpha, 1)
 
     def case1():
         def act(z):
@@ -240,8 +237,21 @@ def learn():
             z = yield sigmoid(z)
 
         def d_act(z):
+            z = yield d_sigmoid(z)
             z = yield d_tanh(z)
-            z = yield d_tanh(z)
+
+        classify(gn=act, dgn=d_act)
+        plot()
+
+    def case3():
+        def act(z):
+            z = yield relu(z)
+            z = yield relu(z)
+            z = yield sigmoid(z)
+
+        def d_act(z):
+            z = yield d_sigmoid(z)
+            z = yield d_relu(z)
 
         classify(gn=act, dgn=d_act)
         plot()
@@ -262,8 +272,8 @@ def learn():
         output_frame_plot(train_loss[-1], test_loss[-1], train_acc[-1], test_acc[-1])
 
     # case1()
-    case2()
-    # case3()
+    # case2()
+    case3()
 
 
 learn()
