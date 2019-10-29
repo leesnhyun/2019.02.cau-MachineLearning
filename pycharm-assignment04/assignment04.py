@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import time
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -82,18 +81,19 @@ def output_frame_plot(tloss, vloss, tacc, vacc):
 
 def binary_classify(train_data, validation_data, train_label, validation_label):
     num_of_layers = 3
-    num_of_nodes = 50
+    n1, n2 = 150, 50
     learning_rate = 0.055
     epsilon = 10e-6
 
     # INITIALIZE u v z
-    # u = np.zeros((DIMENSION+1, num_of_nodes))
-    u = np.random.randn(DIMENSION+1, num_of_nodes*3)
-    v = np.random.randn(num_of_nodes*3, num_of_nodes)
-    
-    # v = np.zeros((num_of_nodes, num_of_nodes))
-    # w = np.zeros((num_of_nodes, 1))
-    w = np.random.randn(num_of_nodes, 1)
+    u = np.random.randn(DIMENSION, n1)
+    v = np.random.randn(n1, n2)
+    w = np.random.randn(n2, 1)
+
+    # INITIALIZE bias
+    b1 = np.random.randn(n1, 1)
+    b2 = np.random.randn(n2, 1)
+    b3 = np.random.randn(1, 1)
 
     train_losses = []
     test_losses = []
@@ -118,42 +118,48 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
         return len(arr) / len(ans)
 
     def du(x, a, b, c, v, cached):
-        return (1/c.shape[1]) * np.dot(np.dot(v, np.dot(w, cached) * d_sigmoid(b)) * d_sigmoid(a), x.T)
+        return np.dot(np.dot(v, np.dot(w, cached) * d_sigmoid(b)) * d_sigmoid(a), x.T) / c.shape[1]
 
     def dv(a, b, c, w, cached):
-        return (1/c.shape[1]) * np.dot(np.dot(w, cached) * d_sigmoid(b), sigmoid(a).T)
+        return np.dot(np.dot(w, cached) * d_sigmoid(b), sigmoid(a).T) / c.shape[1]
 
     def dw(b, c, cached):
-        return (1/c.shape[1]) * np.dot(cached, sigmoid(b).T)
+        return np.dot(cached, sigmoid(b).T) / c.shape[1]
 
     def iterate():
         p_train_loss = 0
-        iter = 0
-        nonlocal u, v, w
+        nonlocal u, v, w, b1, b2, b3
         nonlocal train_losses, test_losses, train_accuracies, test_accuracies
 
-        train_data_with_bias = np.concatenate((train_data, np.ones((1, train_data.shape[1]))))
-        validation_data_with_bias = np.concatenate((validation_data, np.ones((1, validation_data.shape[1]))))
 
         while True:
-            # forward propagation
-            a = np.dot(u.T, train_data_with_bias)
-            b = np.dot(v.T, sigmoid(a))
-            c = np.dot(w.T, sigmoid(b))
 
-            vz = np.dot(u.T, validation_data_with_bias)
-            vz = np.dot(v.T, sigmoid(vz))
-            vz = np.dot(w.T, sigmoid(vz))
+            # forward propagation #
+            a = np.dot(u.T, train_data) + b1
+            b = np.dot(v.T, sigmoid(a)) + b2
+            c = np.dot(w.T, sigmoid(b)) + b3
+
+            vz = np.dot(u.T, validation_data) + b1
+            vz = np.dot(v.T, sigmoid(vz)) + b2
+            vz = np.dot(w.T, sigmoid(vz)) + b3
+            ####
 
             # back propagation
             cached = (sigmoid(c) - train_label)
             w = w - (learning_rate * dw(b, c, cached)).T
             v = v - (learning_rate * dv(a, b, c, w, cached)).T
-            u = u - (learning_rate * du(train_data_with_bias, a, b, c, v, cached)).T
+            u = u - (learning_rate * du(train_data, a, b, c, v, cached)).T
 
+            b3 = b3 - (learning_rate * (np.sum(cached, axis=1, keepdims=True) / c.shape[1]))
+            b2 = b2 - (learning_rate * (np.sum(np.dot(w, cached) * d_sigmoid(b), axis=1, keepdims=True) / c.shape[1]))
+            b1 = b1 - (learning_rate * (np.sum(np.dot(v, np.dot(w, cached) * d_sigmoid(b)) * d_sigmoid(a), axis=1, keepdims=True) / c.shape[1]))
+            ####
+
+            # get losses
             n_train_loss = loss(sigmoid(c), train_label)
             n_test_loss = loss(sigmoid(vz), validation_label)
 
+            # get accuracies
             n_train_acc = accuracy(sigmoid(c), train_label)
             n_test_acc = accuracy(sigmoid(vz), validation_label)
 
@@ -165,8 +171,7 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
             if abs(p_train_loss - n_train_loss) < epsilon:
                 break
             else:
-                # iter = iter + 1
-                # print('t loss: %s, v loss: %s' % (n_train_loss, n_test_loss))
+                print('t loss: %s, v loss: %s' % (n_train_loss, n_test_loss))
                 p_train_loss = n_train_loss
                 continue
 
@@ -175,6 +180,7 @@ def binary_classify(train_data, validation_data, train_label, validation_label):
     return train_losses, test_losses, train_accuracies, test_accuracies
 
 
+# COLLECTING RESULTS #
 t_data, v_data, t_label, v_label = pre_process(batch_size=3, num_workers=1)
 
 train_loss, test_loss, train_acc, test_acc = binary_classify(t_data, v_data, t_label, v_label)
