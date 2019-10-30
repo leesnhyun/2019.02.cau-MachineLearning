@@ -85,7 +85,7 @@ def output_frame_plot(tloss, vloss, tacc, vacc, title):
 # binary classifier
 def binary_classify(train_data, validation_data,
                     train_label, validation_label,
-                    gn_act, gn_d_act, learning_rate=0.0002):
+                    gn_act, gn_d_act, init, learning_rate=0.0002):
 
     num_of_layers = 3
     n1, n2 = 150, 50
@@ -93,25 +93,20 @@ def binary_classify(train_data, validation_data,
     epsilon = 10e-6
 
     # INITIALIZE u v z
-    # u = np.random.randn(DIMENSION, n1)
-    # v = np.random.randn(n1, n2)
-    # w = np.random.randn(n2, 1)
-    u = np.random.randn(DIMENSION, n1) * np.sqrt(2 / (DIMENSION + n1))
-    v = np.random.randn(n1, n2) * np.sqrt(2 / (n1 + n2))
-    w = np.random.randn(n2, 1) * np.sqrt(2 / (n2 + 1))
+    u, v, w = init(DIMENSION, n1, n2)
 
     # INITIALIZE bias
-    b1 = np.random.randn(n1, 1)
-    b2 = np.random.randn(n2, 1)
-    b3 = np.random.randn(1, 1)
+    b1 = np.zeros((n1, 1))
+    b2 = np.zeros((n2, 1))
+    b3 = np.zeros((1, 1))
 
     train_losses = []
     test_losses = []
     train_accuracies = []
     test_accuracies = []
 
-    def safe_ln(x, minval=10e-20):
-        return np.log(x.clip(min=minval))
+    # def safe_ln(x, minval=10e-20):
+    #     return np.log(x.clip(min=minval))
 
     def cross_entropy(prob, ans):
         return -(np.nan_to_num(ans * np.log(prob)) + np.nan_to_num((1 - ans) * np.log(1-prob)))
@@ -154,7 +149,6 @@ def binary_classify(train_data, validation_data,
             # back propagation #
             d_act = gn_d_act()
             next(d_act)
-
             cw = (a3 - train_label)
             dw = np.dot(cw, a2.T) / z3.shape[1]
 
@@ -192,7 +186,7 @@ def binary_classify(train_data, validation_data,
             if abs(p_train_loss - n_train_loss) < epsilon:
                 break
             else:
-                # print('t loss: %s, v loss: %s' % (n_train_loss, n_test_loss))
+                print('t loss: %s, v loss: %s' % (n_train_loss, n_test_loss))
                 p_train_loss = n_train_loss
                 continue
 
@@ -208,7 +202,26 @@ def learn(case, title):
     t_data, v_data, t_label, v_label = pre_process(batch_size=3, num_workers=1)
     train_loss, test_loss, train_acc, test_acc = [], [], [], []
 
-    # functions
+    # initialization functions
+    def he_initialize(n0, n1, n2):
+        u = np.random.randn(n0, n1) * np.sqrt(2 / n0)
+        v = np.random.randn(n1, n2) * np.sqrt(2 / n1)
+        w = np.random.randn(n2, 1) * np.sqrt(2 / n2)
+        return u, v, w
+
+    def xaiver_initialize(n0, n1, n2):
+        u = np.random.randn(n0, n1) * np.sqrt(1 / n0)
+        v = np.random.randn(n1, n2) * np.sqrt(1 / n1)
+        w = np.random.randn(n2, 1) * np.sqrt(1 / n2)
+        return u, v, w
+
+    def gen_xaiver_initialize(n0, n1, n2):
+        u = np.random.randn(n0, n1) * np.sqrt(1 / (n0 + n1))
+        v = np.random.randn(n1, n2) * np.sqrt(1 / (n1 + n2))
+        w = np.random.randn(n2, 1) * np.sqrt(1 / (n2 + 1))
+        return u, v, w
+
+    # activation functions
     def sigmoid(z):
         return 1 / (1 + np.exp(-z))
 
@@ -234,6 +247,7 @@ def learn(case, title):
         return np.where(z <= 0, leaky_alpha, 1)
 
     # case-studies
+    # sigmoid
     def case1(learning_rate):
         def act():
             z = yield
@@ -246,9 +260,15 @@ def learn(case, title):
             z = yield d_sigmoid(z)
             z = yield d_sigmoid(z)
 
-        classify(gn=act, dgn=d_act, learning_rate=learning_rate)
+        classify(
+            gn=act,
+            dgn=d_act,
+            learning_rate=learning_rate,
+            init=gen_xaiver_initialize
+        )
         plot()
 
+    # tanh
     def case2(learning_rate):
         def act():
             z = yield
@@ -261,9 +281,15 @@ def learn(case, title):
             z = yield d_tanh(z)
             z = yield d_tanh(z)
 
-        classify(gn=act, dgn=d_act, learning_rate=learning_rate)
+        classify(
+            gn=act,
+            dgn=d_act,
+            learning_rate=learning_rate,
+            init=xaiver_initialize
+        )
         plot()
 
+    # relu
     def case3(learning_rate):
         def act():
             z = yield
@@ -276,9 +302,15 @@ def learn(case, title):
             z = yield d_relu(z)
             z = yield d_relu(z)
 
-        classify(gn=act, dgn=d_act, learning_rate=learning_rate)
+        classify(
+            gn=act,
+            dgn=d_act,
+            learning_rate=learning_rate,
+            init=he_initialize
+        )
         plot()
 
+    # leaky relu
     def case4(learning_rate):
         def act():
             z = yield
@@ -291,16 +323,23 @@ def learn(case, title):
             z = yield d_leaky_relu(z)
             z = yield d_leaky_relu(z)
 
-        classify(gn=act, dgn=d_act, learning_rate=learning_rate)
+        classify(
+            gn=act,
+            dgn=d_act,
+            learning_rate=learning_rate,
+            init=he_initialize
+        )
         plot()
 
-    def classify(gn, dgn, learning_rate):
+    def classify(gn, dgn, learning_rate, init):
         nonlocal train_loss, test_loss, train_acc, test_acc
 
         train_loss, test_loss, train_acc, test_acc = binary_classify(
             t_data, v_data,
             t_label, v_label,
-            gn, dgn, learning_rate
+            gn, dgn,
+            learning_rate=learning_rate,
+            init=init
         )
 
     def plot():
@@ -315,13 +354,13 @@ def learn(case, title):
         output_frame_plot(train_loss[-1], test_loss[-1], train_acc[-1], test_acc[-1], title=title)
 
     if case == 1:
-        case1(learning_rate=0.005)
+        case1(learning_rate=0.015)
     elif case == 2:
-        case2(learning_rate=0.0005)
+        case2(learning_rate=0.0015)
     elif case == 3:
-        case3(learning_rate=0.0005)
+        case3(learning_rate=0.0015)
     elif case == 4:
-        case4(learning_rate=0.0005)
+        case4(learning_rate=0.0015)
 
 
 learn(case=1, title="sigmoid sigmoid sigmoid")
