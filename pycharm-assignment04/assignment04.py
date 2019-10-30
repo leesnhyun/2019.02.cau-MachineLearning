@@ -114,7 +114,7 @@ def binary_classify(train_data, validation_data,
         return np.log(x.clip(min=minval))
 
     def cross_entropy(prob, ans):
-        return -(ans * np.log(prob) + (1 - ans) * np.log(1-prob))
+        return -(np.nan_to_num(ans * np.log(prob)) + np.nan_to_num((1 - ans) * np.log(1-prob)))
         # return -(ans * safe_ln(prob) + (1 - ans) * safe_ln(1-prob))
 
     def loss(prob, ans):
@@ -164,14 +164,14 @@ def binary_classify(train_data, validation_data,
             cu = np.dot(v, cv) * d_act.send(z1)
             du = np.dot(cu, train_data.T) / z3.shape[1]
 
-            # gradient descent
-            w = w - (learning_rate * dw).T
-            v = v - (learning_rate * dv).T
-            u = u - (learning_rate * du).T
-
             b3 = b3 - (learning_rate * (np.sum(cw, axis=1, keepdims=True) / z3.shape[1]))
             b2 = b2 - (learning_rate * (np.sum(cv, axis=1, keepdims=True) / z3.shape[1]))
             b1 = b1 - (learning_rate * (np.sum(cu, axis=1, keepdims=True) / z3.shape[1]))
+
+            # gradient descent #
+            w = w - (learning_rate * dw).T
+            v = v - (learning_rate * dv).T
+            u = u - (learning_rate * du).T
             ####
 
             # get losses
@@ -233,6 +233,7 @@ def learn(case, title):
     def d_leaky_relu(z):
         return np.where(z <= 0, leaky_alpha, 1)
 
+    # case-studies
     def case1(learning_rate):
         def act():
             z = yield
