@@ -71,15 +71,17 @@ def output_plot(g1, g2, title, color, label, legend):
     plt.show()
 
 
-def output_frame_plot(tloss, vloss, tacc, vacc, title):
+def output_frame_plot(tloss, vloss, tacc, vacc, b_vloss, b_vacc, title):
     print(" << %s >>" % title)
-    print("---------------------------------------")
-    print("           |   loss   |  accuracy  |")
-    print("---------------------------------------")
-    print("training   |   %.2f   |    %.2f    |" % (tloss, tacc))
-    print("---------------------------------------")
-    print("validation |   %.2f   |    %.2f    |" % (vloss, vacc))
-    print("---------------------------------------")
+    print("------------------------------------------------------")
+    print("                |   %10s    |    %10s     |" % ('loss', 'accuracy'))
+    print("------------------------------------------------------")
+    print("training        |   %.10f   |    %.10f    |" % (tloss, tacc))
+    print("------------------------------------------------------")
+    print("validation      |   %.10f   |    %.10f    |" % (vloss, vacc))
+    print("------------------------------------------------------")
+    print("best validation |   %.10f   |    %.10f    |" % (b_vloss, b_vacc))
+    print("------------------------------------------------------")
 
 
 # binary classifier
@@ -88,7 +90,7 @@ def binary_classify(train_data, validation_data,
                     gn_act, gn_d_act, init, learning_rate=0.0002):
 
     num_of_layers = 3
-    n1, n2 = 150, 50
+    n1, n2 = 50, 80
     learning_rate = learning_rate
     epsilon = 10e-6
 
@@ -96,8 +98,8 @@ def binary_classify(train_data, validation_data,
     u, v, w = init(DIMENSION, n1, n2)
 
     # INITIALIZE bias
-    b1 = np.zeros((n1, 1))
-    b2 = np.zeros((n2, 1))
+    b1 = np.random.randn(n1, 1)
+    b2 = np.random.randn(n2, 1)
     b3 = np.zeros((1, 1))
 
     train_losses = []
@@ -197,16 +199,22 @@ def binary_classify(train_data, validation_data,
 
 def learn(case, title):
 
-    leaky_alpha = 0.01
+    leaky_alpha = 0.002
 
     t_data, v_data, t_label, v_label = pre_process(batch_size=3, num_workers=1)
     train_loss, test_loss, train_acc, test_acc = [], [], [], []
 
     # initialization functions
     def he_initialize(n0, n1, n2):
-        u = np.random.randn(n0, n1) * np.sqrt(2 / n0)
-        v = np.random.randn(n1, n2) * np.sqrt(2 / n1)
-        w = np.random.randn(n2, 1) * np.sqrt(2 / n2)
+        u = np.random.randn(n0, n1) / np.sqrt(n0/2)
+        v = np.random.randn(n1, n2) / np.sqrt(n1/2)
+        w = np.random.randn(n2, 1) / np.sqrt(n2/2)
+        return u, v, w
+
+    def he_initialize2(n0, n1, n2):
+        u = np.random.randn(n0, n1) * np.sqrt(2 / (n0+n1))
+        v = np.random.randn(n1, n2) * np.sqrt(2 / (n1+n2))
+        w = np.random.randn(n2, 1) * np.sqrt(2 / (n2+1))
         return u, v, w
 
     def xaiver_initialize(n0, n1, n2):
@@ -351,7 +359,12 @@ def learn(case, title):
                     title="Accuracy :: " + title, color=('blue', 'red'),
                     label=('train accuracy', 'validation accuracy'), legend='lower right')
 
-        output_frame_plot(train_loss[-1], test_loss[-1], train_acc[-1], test_acc[-1], title=title)
+        output_frame_plot(
+            train_loss[-1], test_loss[-1],
+            train_acc[-1], test_acc[-1],
+            test_loss[np.argmax(test_acc)], max(test_acc),
+            title=title
+        )
 
     if case == 1:
         case1(learning_rate=0.015)
@@ -360,10 +373,10 @@ def learn(case, title):
     elif case == 3:
         case3(learning_rate=0.0015)
     elif case == 4:
-        case4(learning_rate=0.0015)
+        case4(learning_rate=0.0005)
 
 
-learn(case=1, title="sigmoid sigmoid sigmoid")
-learn(case=2, title="tanh tanh sigmoid")
-learn(case=3, title="ReLU ReLU sigmoid")
+# learn(case=1, title="sigmoid sigmoid sigmoid")
+# learn(case=2, title="tanh tanh sigmoid")
+# learn(case=3, title="ReLU ReLU sigmoid")
 learn(case=4, title="Leaky-ReLU Leaky-ReLU sigmoid")
