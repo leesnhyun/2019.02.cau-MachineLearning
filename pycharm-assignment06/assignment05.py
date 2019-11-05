@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+import math
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
@@ -20,22 +21,21 @@ def pre_process(batch_size=3, num_workers=1):
         transforms.ToTensor(), ])
 
     # train_data_path = 'relative path of training data set'
-    train_data_path = './horse-or-human/train'
-    trainset = torchvision.datasets.ImageFolder(root=train_data_path, transform=transform)
     # change the valuse of batch_size, num_workers for your program
     # if shuffle=True, the data reshuffled at every epoch
+    train_data_path = './horse-or-human/train'
+    trainset = torchvision.datasets.ImageFolder(root=train_data_path, transform=transform)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
     validation_data_path = './horse-or-human/validation'
     valset = torchvision.datasets.ImageFolder(root=validation_data_path, transform=transform)
-    # change the valuse of batch_size, num_workers for your program
     valloader = torch.utils.data.DataLoader(valset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    train_data = np.empty((DIMENSION, 0))
-    validation_data = np.empty((DIMENSION, 0))
+    train_data = torch.empty((DIMENSION, 0))
+    validation_data = torch.empty((DIMENSION, 0))
 
-    train_label = np.array([])
-    validation_label = np.array([])
+    train_label = torch.empty((1, 0))
+    validation_label = torch.empty((1, 0))
 
     for i, data in enumerate(trainloader):
         # inputs is the image
@@ -43,11 +43,13 @@ def pre_process(batch_size=3, num_workers=1):
         inputs, labels = data
 
         # if you don't change the image size, it will be [batch_size, 1, 100, 100]
-
         # [batch_size, 1, height, width] => [ width * height * channel, batch_size ]
-        x = np.array(inputs).transpose((2, 3, 0, 1)).reshape((DIMENSION, len(labels)))
-        train_data = np.concatenate((train_data, x), axis=1)
-        train_label = np.concatenate((train_label, np.array(labels)))
+        # x = inputs.transpose((2, 3, 0, 1)).reshape((DIMENSION, len(labels)))
+        x = inputs.reshape((DIMENSION, len(labels)))
+        y = labels.reshape((1, len(labels))).type(torch.float)
+
+        train_data = torch.cat((train_data, x), dim=1)
+        train_label = torch.cat((train_label, y), dim=1)
 
     # load validation images of the batch size for every iteration
     for i, data in enumerate(valloader):
@@ -56,9 +58,11 @@ def pre_process(batch_size=3, num_workers=1):
         inputs, labels = data
 
         # [batch_size, 1, height, width] => [ width * height * channel, batch_size ]
-        x = np.array(inputs).transpose((2, 3, 0, 1)).reshape((DIMENSION, len(labels)))
-        validation_data = np.concatenate((validation_data, x), axis=1)
-        validation_label = np.concatenate((validation_label, np.array(labels)))
+        x = inputs.reshape((DIMENSION, len(labels)))
+        y = labels.reshape((1, len(labels))).type(torch.float)
+
+        validation_data = torch.cat((validation_data, x), dim=1)
+        validation_label = torch.cat((validation_label, y), dim=1)
 
     return train_data, validation_data, train_label, validation_label
 
@@ -95,39 +99,44 @@ def binary_classify(train_data, validation_data,
     learning_rate = learning_rate
     regular_weight = regular_weight
 
-    epsilon = 10e-6
+    epsilon = 10e-8
 
     # INITIALIZE u v z
     u, v, w = init(DIMENSION, n1, n2)
 
     # INITIALIZE bias
-    b1 = np.random.randn(n1, 1)
-    b2 = np.random.randn(n2, 1)
-    b3 = np.zeros((1, 1))
+    b1 = torch.randn((n1, 1))
+    b2 = torch.randn((n2, 1))
+    b3 = torch.randn((1, 1))
 
     train_losses = []
     test_losses = []
     train_accuracies = []
     test_accuracies = []
 
+    def _nan_to_num(tensor):
+        return torch.from_numpy(np.nan_to_num(tensor.numpy()))
+
     # def safe_ln(x, minval=10e-20):
     #     return np.log(x.clip(min=minval))
 
     def sq_frobenius(mat):
-        return np.add.reduce(np.add.reduce(mat ** 2))
+        return (torch.sum(mat ** 2)).item()
 
     def cross_entropy(prob, ans):
-        return -(np.nan_to_num(ans * np.log(prob)) + np.nan_to_num((1 - ans) * np.log(1-prob)))
-        # return -(ans * safe_ln(prob) + (1 - ans) * safe_ln(1-prob))
+        return -((_nan_to_num(ans * torch.log(prob))) +
+                 (_nan_to_num((1 - ans) * torch.log(1-prob))))
 
     def loss(prob, ans):
-        return ((1 / len(ans)) * np.nan_to_num(np.sum(cross_entropy(prob, ans)))) + \
-               (regular_weight / (2*len(ans))) * (sq_frobenius(u) + sq_frobenius(v) + sq_frobenius(w))
+        a = torch.sum(_nan_to_num(cross_entropy(prob, ans))).item() / ans.shape[1]
+        b = (regular_weight / (2*ans.shape[1])) * (sq_frobenius(u) + sq_frobenius(v) + sq_frobenius(w))
+        return a + b
 
     def accuracy(prob, ans):
-        arr = np.array(list(map(lambda x: 1 if x > 0.5 else 0, prob.flatten())))
-        arr = list(filter(lambda x: x == 0, arr - ans))
-        return len(arr) / len(ans)
+        arr = (prob > 0.5).long()
+        arr = arr - ans.long()
+        arr = (arr == 0).long()
+        return torch.sum(arr).item() / ans.shape[1]
 
     def iterate():
         p_train_loss = 0
@@ -139,37 +148,37 @@ def binary_classify(train_data, validation_data,
             # forward propagation #
             act = gn_act()
             next(act)
-            z1 = np.dot(u.T, train_data) + b1
+            z1 = torch.mm(u.T, train_data) + b1
             a1 = act.send(z1)
 
-            z2 = np.dot(v.T, a1) + b2
+            z2 = torch.mm(v.T, a1) + b2
             a2 = act.send(z2)
 
-            z3 = np.dot(w.T, a2) + b3
+            z3 = torch.mm(w.T, a2) + b3
             a3 = act.send(z3)
 
             act = gn_act()
             next(act)
-            vz = np.dot(u.T, validation_data) + b1
-            vz = np.dot(v.T, act.send(vz)) + b2
-            vz = np.dot(w.T, act.send(vz)) + b3
+            vz = torch.mm(u.T, validation_data) + b1
+            vz = torch.mm(v.T, act.send(vz)) + b2
+            vz = torch.mm(w.T, act.send(vz)) + b3
             ####
 
             # back propagation #
             d_act = gn_d_act()
             next(d_act)
             cw = (a3 - train_label)
-            dw = np.dot(cw, a2.T) / z3.shape[1]
+            dw = torch.mm(cw, a2.T) / z3.shape[1]
 
-            cv = np.dot(w, cw) * d_act.send(z2)
-            dv = np.dot(cv, a1.T) / z3.shape[1]
+            cv = torch.mm(w, cw) * d_act.send(z2)
+            dv = torch.mm(cv, a1.T) / z3.shape[1]
 
-            cu = np.dot(v, cv) * d_act.send(z1)
-            du = np.dot(cu, train_data.T) / z3.shape[1]
+            cu = torch.mm(v, cv) * d_act.send(z1)
+            du = torch.mm(cu, train_data.T) / z3.shape[1]
 
-            b3 = b3 - (learning_rate * (np.sum(cw, axis=1, keepdims=True) / z3.shape[1]))
-            b2 = b2 - (learning_rate * (np.sum(cv, axis=1, keepdims=True) / z3.shape[1]))
-            b1 = b1 - (learning_rate * (np.sum(cu, axis=1, keepdims=True) / z3.shape[1]))
+            b3 = b3 - (learning_rate * (torch.sum(cw, dim=1, keepdim=True) / z3.shape[1]))
+            b2 = b2 - (learning_rate * (torch.sum(cv, dim=1, keepdim=True) / z3.shape[1]))
+            b1 = b1 - (learning_rate * (torch.sum(cu, dim=1, keepdim=True) / z3.shape[1]))
 
             # gradient descent #
             w = w - (learning_rate * dw).T - (learning_rate * (regular_weight * w)/n)
@@ -229,14 +238,14 @@ def learn(title):
         return u, v, w
 
     def gen_xaiver_initialize(n0, n1, n2):
-        u = np.random.randn(n0, n1) * np.sqrt(1 / (n0 + n1))
-        v = np.random.randn(n1, n2) * np.sqrt(1 / (n1 + n2))
-        w = np.random.randn(n2, 1) * np.sqrt(1 / (n2 + 1))
+        u = torch.randn(n0, n1) * math.sqrt(1 / (n0 + n1))
+        v = torch.randn(n1, n2) * math.sqrt(1 / (n1 + n2))
+        w = torch.randn(n2, 1) * math.sqrt(1 / (n2 + 1))
         return u, v, w
 
     # activation functions
     def sigmoid(z):
-        return 1 / (1 + np.exp(-z))
+        return 1 / (1 + torch.exp(-z))
 
     def d_sigmoid(z):
         return sigmoid(z) * (1 - sigmoid(z))
