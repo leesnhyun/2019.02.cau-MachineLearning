@@ -4,7 +4,6 @@ import numpy as np
 import math
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torch.multiprocessing import set_start_method
 import torchvision.transforms as transforms
 import torchvision
 
@@ -14,7 +13,7 @@ IMAGE_CHANNEL = 1
 DIMENSION = IMAGE_CHANNEL * IMAGE_HEIGHT * IMAGE_WIDTH
 
 # global settings
-torch.set_default_dtype(torch.float64)
+# torch.set_default_dtype(torch.float64)
 torch.set_default_tensor_type('torch.cuda.DoubleTensor')
 torch.set_printoptions(precision=16)
 torch.cuda.set_device(0)
@@ -122,7 +121,7 @@ def binary_classify(train_data, validation_data,
 
     n = train_label.shape[1]
 
-    n1, n2 = 150, 50
+    n1, n2 = 50, 150
     learning_rate = learning_rate
     regular_weight = regular_weight
 
@@ -132,10 +131,6 @@ def binary_classify(train_data, validation_data,
     u, v, w = init(DIMENSION, n1, n2)
 
     # INITIALIZE bias
-    # b1 = torch.randn((n1, 1))
-    # b2 = torch.randn((n2, 1))
-    # b3 = torch.randn((1, 1))
-
     b1 = torch.zeros((n1, 1))
     b2 = torch.zeros((n2, 1))
     b3 = torch.zeros((1, 1))
@@ -245,7 +240,7 @@ def binary_classify(train_data, validation_data,
     return train_losses, test_losses, train_accuracies, test_accuracies
 
 
-def learn(title):
+def learn(title, learning_rate=0.015, regular_weight=49.195):
 
     t_data, v_data, t_label, v_label = pre_process(batch_size=3)
     train_loss, test_loss, train_acc, test_acc = [], [], [], []
@@ -337,7 +332,7 @@ def learn(title):
             title=title
         )
 
-    case1(learning_rate=0.015, regular_weight=51)
+    case1(learning_rate=learning_rate, regular_weight=regular_weight)
 
 
-learn(title="Sigmoid")
+learn(title="Sigmoid", learning_rate=0.015, regular_weight=49.195)
