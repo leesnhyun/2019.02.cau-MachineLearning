@@ -146,7 +146,7 @@ model.cuda()
 # -----------------------------------------------------------------------------
 learning_rate = 0.5
 optimizer = optim.SGD(model.parameters(), lr=learning_rate, weight_decay=0.09)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=10, min_lr=0.001, verbose=True)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, min_lr=0.001, verbose=True)
 objective = nn.CrossEntropyLoss()
 
 
@@ -164,6 +164,17 @@ def output_frame_plot(tloss, vloss, tacc, vacc, title):
     print("------------------------------------------------------")
 
 
+def output_plot(g1, g2, std, title, color, label, legend):
+    plt.title(title)
+    plt.plot(np.arange(1, len(g1) + 1), g1, color=color[0], alpha=0.5, label=label[0])
+    plt.plot(np.arange(1, len(g2) + 1), g2, color=color[1], alpha=0.5, label=label[1])
+    if std is not None:
+        plt.fill_between(np.arange(1, len(g1)+1),
+                         np.array(g1)-np.array(std),
+                         np.array(g1)+np.array(std), color=color[0], alpha=0.3)
+    plt.legend(loc=legend)
+    plt.show()
+
 # -----------------------------------------------------------------------------
 # function for training the model
 # -----------------------------------------------------------------------------
@@ -177,6 +188,9 @@ def train():
     model.train()
 
     for idx_batch, (data, target) in enumerate(loader_train):
+
+        if len(data) % batch_size != 0:
+            continue
 
         correct = 0
 
@@ -201,8 +215,12 @@ def train():
     loss_train_mean = np.mean(loss_train)
     loss_train_std = np.std(loss_train)
     acc_train_mean = np.mean(acc_train)
+    acc_train_std = np.std(acc_train)
 
-    return {'loss_train_mean': loss_train_mean, 'loss_train_std': loss_train_std, 'accuracy_train_mean':acc_train_mean}
+    return {'loss_train_mean': loss_train_mean,
+            'loss_train_std': loss_train_std,
+            'accuracy_train_mean': acc_train_mean,
+            'accuracy_train_std': acc_train_std}
 
 
 # -----------------------------------------------------------------------------
@@ -238,10 +256,10 @@ def test():
 # iteration for the epoch
 # -----------------------------------------------------------------------------
 
-loss_train_mean, loss_train_std, loss_test, accuracy_test, accuracy_train = [], [], [], [], []
+loss_train_mean, loss_train_std, loss_test, accuracy_train_std, accuracy_test, accuracy_train = [], [], [], [], [], []
 prev_train_loss, next_train_loss = 0, 0
 
-for e in range(1000):
+for e in range(5000):
     result_train = train()
     result_test = test()
 
@@ -252,14 +270,20 @@ for e in range(1000):
     loss_test.append(result_test['loss_test'])
 
     accuracy_train.append(result_train['accuracy_train_mean'])
+    accuracy_train_std.append(result_train['accuracy_train_std'])
     accuracy_test.append(result_test['accuracy_test'])
 
     print("[epoch %s] loss: (training) %s, (testing) %s, accuracy: (training) %s, (testing) %s" %
           (e, loss_train_mean[-1], loss_test[-1], accuracy_train[-1], accuracy_test[-1]))
 
-    if abs(next_train_loss - prev_train_loss) < 10e-7:
-        output_frame_plot(loss_train_mean[-1], loss_test[-1], accuracy_train[-1], accuracy_test[-1], "Result")
+    if abs(next_train_loss - prev_train_loss) < 10e-8:
         break
     else:
         prev_train_loss = next_train_loss
         scheduler.step(result_test['accuracy_test'], e)
+
+output_frame_plot(loss_train_mean[-1], loss_test[-1], accuracy_train[-1], accuracy_test[-1], "Result")
+output_plot(loss_train_mean, loss_test, std=loss_train_std, title="Loss", color=('blue', 'red'),
+            label=('train loss', 'validation loss'), legend='upper right')
+output_plot(accuracy_train, accuracy_test, std=accuracy_train_std, title="Accuracy", color=('blue', 'red'),
+            label=('train accuracy', 'validation accuracy'), legend='lower right')
