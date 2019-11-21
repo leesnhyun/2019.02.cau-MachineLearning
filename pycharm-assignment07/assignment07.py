@@ -69,8 +69,8 @@ class Linear(nn.Module):
         self.fc2 = nn.Linear(_num1, _num2, bias=True)
         self.fc3 = nn.Linear(_num2, num_classes, bias=True)
 
-        self.fc_layer1 = nn.Sequential(self.fc1, nn.LeakyReLU(True))
-        self.fc_layer2 = nn.Sequential(self.fc2, nn.LeakyReLU(True))
+        self.fc_layer1 = nn.Sequential(self.fc1, nn.LeakyReLU(negative_slope=0.04))
+        self.fc_layer2 = nn.Sequential(self.fc2, nn.LeakyReLU(negative_slope=0.04))
         self.fc_layer3 = nn.Sequential(self.fc3, nn.Sigmoid())
 
         self.classifier = nn.Sequential(self.fc_layer1, self.fc_layer2, self.fc_layer3)
@@ -146,7 +146,7 @@ model.cuda()
 # -----------------------------------------------------------------------------
 learning_rate = 0.5
 optimizer = optim.SGD(model.parameters(), lr=learning_rate, weight_decay=0.09)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, min_lr=0.001, verbose=True)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5, min_lr=0.001, verbose=True)
 objective = nn.CrossEntropyLoss()
 
 
